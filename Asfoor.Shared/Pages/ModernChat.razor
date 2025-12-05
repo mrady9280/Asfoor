@@ -1,4 +1,4 @@
-@page "/modern-chat"
+@page "/"
 @using Asfoo.Models
 @using Asfoor.Shared.Services
 @using Microsoft.Extensions.AI
@@ -9,21 +9,21 @@
 
 <PageTitle>Modern Chat</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Style="height: calc(100vh - 180px);">
-    <MudPaper Elevation="3" Style="height: 100%; display: flex; flex-direction: column;">
+<MudContainer MaxWidth="MaxWidth.Large" Style="height: calc(100vh - 100px);">
+    <div class="d-flex flex-column mud-paper mud-theme-surface" style="height: 100%;">
 
         @* Header *@
-        <MudPaper Elevation="1" Class="pa-3">
+        <div class="pa-3">
             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                 <MudStack Row="true" AlignItems="AlignItems.Center">
-                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Class="mr-2"/>
-                    <MudText Typo="Typo.h6">AI Assistant</MudText>
+                    @* <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Class="mr-2"/> *@
+                    @* <MudText Typo="Typo.h6">Asfoor</MudText> *@
                 </MudStack>
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudSelect T="string" 
-                               @bind-Value="selectedReasoningLevel" 
-                               Label="Reasoning Level" 
-                               Variant="Variant.Outlined" 
+                    <MudSelect T="string"
+                               @bind-Value="selectedReasoningLevel"
+                               Label="Reasoning Level"
+                               Variant="Variant.Outlined"
                                Dense="true"
                                Style="min-width: 180px;">
                         <MudSelectItem Value="@("Minimal")">Minimal (Fastest)</MudSelectItem>
@@ -42,10 +42,10 @@
                     </MudTooltip>
                 </MudStack>
             </MudStack>
-        </MudPaper>
+        </div>
 
         @* Messages area *@
-        <MudPaper Elevation="0" Class="pa-4 flex-grow-1" id="chat-messages" Style="overflow-y: auto;">
+        <div class="pa-4 flex-grow-1" id="chat-messages" style="overflow-y: auto;">
             @if (!messages.Any())
             {
                 <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="h-100">
@@ -109,10 +109,10 @@
                     </MudStack>
                 }
             }
-        </MudPaper>
+        </div>
 
         @* Input area *@
-        <MudPaper Elevation="2" Class="pa-2">
+        <div class="pa-2">
             @if (attachedFiles.Any())
             {
                 <MudPaper Outlined="true" Class="mb-2 pa-2">
@@ -133,13 +133,12 @@
                 <MudTextField @bind-Value="userInput"
                               Label="Type your message..."
                               Variant="Variant.Outlined"
-                              Lines="1"
-                              AutoGrow="true"
-                              MaxLines="5"
+                              Immediate="true"
+                              Lines="2"
                               FullWidth="true"
                               Disabled="@_isSending"
                               OnKeyDown="@HandleKeyDown"
-                              Class="flex-grow-1"/>
+                />
 
                 <MudTooltip Text="Attach files">
                     <MudFileUpload T="IBrowserFile" FilesChanged="HandleFilesSelected" Disabled="@_isSending">
@@ -159,8 +158,8 @@
                 </MudTooltip>
             </MudStack>
             <MudText Typo="Typo.caption" Align="Align.Right" Class="pr-2">Ctrl/Cmd + Enter to send</MudText>
-        </MudPaper>
-    </MudPaper>
+        </div>
+    </div>
 </MudContainer>
 
 @code {
@@ -255,9 +254,9 @@
         try
         {
             CustomChatResponse? response = await AiService.ChatAsync(
-                currentInput, 
-                _conversationId, 
-                serviceAttachments, 
+                currentInput,
+                _conversationId,
+                serviceAttachments,
                 threadString: ThreadString,
                 reasoningEffortLevel: selectedReasoningLevel);
             ChatMessage? assistantMessage = new ChatMessage(ChatRole.Assistant, response?.Response);

@@ -8,14 +8,16 @@
 <MudLayout>
     <MudAppBar Elevation="1" Color="Color.Default">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())"/>
-        <MudText Typo="Typo.h5" Class="ml-3">Asfoor</MudText>
+        <MudText Typo="Typo.h5" Class="ml-3">Asfoor</MudText> <br/>
+        <MudSpacer/>
+        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Class="mr-2"/>
         <MudSpacer/>
         <MudIconButton Icon="@(DarkLightModeButtonIcon)" Color="Color.Inherit" OnClick="@DarkModeToggle"/>
         <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End"/>
     </MudAppBar>
-    <MudDrawer id="nav-drawer" @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
-        <NavMenu/>
-    </MudDrawer>
+    @* <MudDrawer id="nav-drawer" @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2"> *@
+    @*     <NavMenu/> *@
+    @* </MudDrawer> *@
     <MudMainContent Class="pt-16 pa-4">
         @Body
     </MudMainContent>
