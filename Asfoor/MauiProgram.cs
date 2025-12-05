@@ -2,6 +2,7 @@
 using Asfoor.Shared.Services;
 using Asfoor.Services;
 using Microsoft.Extensions.Hosting;
+using MudBlazor.Services;
 
 namespace Asfoor;
 
@@ -26,6 +27,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFormFactor, FormFactor>();
 
         builder.Services.AddMauiBlazorWebView();
+        // Add MudBlazor services
+        builder.Services.AddMudServices();
 
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();

@@ -18,7 +18,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Asfoor.Api\Asfoor.Api.csproj"/>
         <ProjectReference Include="..\Asfoor.Web\Asfoor.Web.csproj"/>
-        <ProjectReference Include="..\Asfoor\Asfoor.csproj" />
+<!--        <ProjectReference Include="..\Asfoor\Asfoor.csproj" />-->
     </ItemGroup>
 
 </Project>

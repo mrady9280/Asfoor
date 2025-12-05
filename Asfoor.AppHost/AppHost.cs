@@ -33,7 +33,7 @@ api
 var web = builder.AddProject<Asfoor_Web>("web")
     .WithReference(api).WaitFor(api);
 
-var app = builder.AddProject<Asfoor>("app")
-    .WithReference(api).WaitFor(api);
+// var app = builder.AddProject<Asfoor>("app")
+//     .WithReference(api).WaitFor(api);
 
 builder.Build().Run();
