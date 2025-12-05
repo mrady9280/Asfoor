@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="JetBrains.Annotations" />
+        <PackageReference Include="Microsoft.Agents.AI"/>
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI"/>
+        <PackageReference Include="Microsoft.Extensions.AI"/>
+        <PackageReference Include="Microsoft.Extensions.DataIngestion"/>
+        <PackageReference Include="Microsoft.Extensions.DataIngestion.Markdig"/>
+        <PackageReference Include="Microsoft.Extensions.DataIngestion.MarkItDown"/>
+        <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase"/>
+        <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase"/>
+        <PackageReference Include="Aspire.Qdrant.Client"/>
+        <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant"/>
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
+        <PackageReference Include="Scalar.AspNetCore" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Asfoo.Models\Asfoo.Models.csproj" />
+<!--      <ProjectReference Include="..\Asfoor.App.ServiceDefaults\Asfoor.App.ServiceDefaults.csproj" />-->
+      <ProjectReference Include="..\Asfoor.ServiceDefaults\Asfoor.ServiceDefaults.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,356 @@
+@page "/modern-chat"
+@using Asfoo.Models
+@using Asfoor.Shared.Services
+@using Microsoft.Extensions.AI
+@inject IAiService AiService
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<PageTitle>Modern Chat</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Style="height: calc(100vh - 180px);">
+    <MudPaper Elevation="3" Style="height: 100%; display: flex; flex-direction: column;">
+
+        @* Header *@
+        <MudPaper Elevation="1" Class="pa-3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Class="mr-2"/>
+                    <MudText Typo="Typo.h6">AI Assistant</MudText>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudSelect T="string" 
+                               @bind-Value="selectedReasoningLevel" 
+                               Label="Reasoning Level" 
+                               Variant="Variant.Outlined" 
+                               Dense="true"
+                               Style="min-width: 180px;">
+                        <MudSelectItem Value="@("Minimal")">Minimal (Fastest)</MudSelectItem>
+                        <MudSelectItem Value="@("Low")">Low (Fast)</MudSelectItem>
+                        <MudSelectItem Value="@("Medium")">Medium (Balanced)</MudSelectItem>
+                        <MudSelectItem Value="@("High")">High (Thorough)</MudSelectItem>
+                    </MudSelect>
+                    <MudTooltip Text="Load external documents">
+                        <MudIconButton Icon="@Icons.Material.Filled.UploadFile" OnClick="@LoadDocumentsAsync"/>
+                    </MudTooltip>
+                    <MudTooltip Text="Reset conversation">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="@ResetConversationAsync"/>
+                    </MudTooltip>
+                    <MudTooltip Text="Save conversation">
+                        <MudIconButton Icon="@Icons.Material.Filled.Save" OnClick="@SaveConversationAsync"/>
+                    </MudTooltip>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @* Messages area *@
+        <MudPaper Elevation="0" Class="pa-4 flex-grow-1" id="chat-messages" Style="overflow-y: auto;">
+            @if (!messages.Any())
+            {
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="h-100">
+                    <MudIcon Icon="@Icons.Material.Filled.ChatBubbleOutline" Size="Size.Large" Color="Color.Primary"
+                             Style="font-size: 4rem;"/>
+                    <MudText Typo="Typo.h6" Color="Color.Primary">Start a Conversation</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Ask me anything or upload files for analysis!
+                    </MudText>
+                </MudStack>
+            }
+            else
+            {
+                @foreach (var message in messages)
+                {
+                    <MudStack Row="true"
+                              Justify="@(message.Role == ChatRole.User ? Justify.FlexEnd : Justify.FlexStart)"
+                              Class="mb-4">
+                        @if (message.Role == ChatRole.Assistant)
+                        {
+                            <MudAvatar Color="Color.Secondary" Size="Size.Medium" Class="mr-2">
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy"/>
+                            </MudAvatar>
+                        }
+
+                        <MudPaper Elevation="2" Class="pa-3" Style="max-width: 70%;">
+                            <MudText Typo="Typo.body1"
+                                     Style="white-space: pre-wrap; word-wrap: break-word;">@message.Text</MudText>
+                            @if (attachmentsByMessage.ContainsKey(message))
+                            {
+                                <MudStack Row="true" Class="mt-2" Style="flex-wrap: wrap;" Spacing="1">
+                                    @foreach (var file in attachmentsByMessage[message])
+                                    {
+                                        <MudChip T="string" Icon="@GetFileIcon(file.ContentType)" Size="Size.Small"
+                                                 Variant="Variant.Outlined">
+                                            @file.Name (@FormatFileSize(file.Size))
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                            }
+                        </MudPaper>
+
+                        @if (message.Role == ChatRole.User)
+                        {
+                            <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="ml-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Person"/>
+                            </MudAvatar>
+                        }
+                    </MudStack>
+                }
+
+                @if (_isSending)
+                {
+                    <MudStack Row="true" Justify="Justify.FlexStart" Class="mb-4">
+                        <MudAvatar Color="Color.Secondary" Size="Size.Medium" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.SmartToy"/>
+                        </MudAvatar>
+                        <MudPaper Elevation="2" Class="pa-3 d-flex align-center">
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mr-2"/>
+                            <MudText Typo="Typo.body1">AI is thinking...</MudText>
+                        </MudPaper>
+                    </MudStack>
+                }
+            }
+        </MudPaper>
+
+        @* Input area *@
+        <MudPaper Elevation="2" Class="pa-2">
+            @if (attachedFiles.Any())
+            {
+                <MudPaper Outlined="true" Class="mb-2 pa-2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="flex-wrap: wrap;">
+                        <MudText Typo="Typo.caption" Style="font-weight: 600;">Attached:</MudText>
+                        @foreach (var file in attachedFiles)
+                        {
+                            <MudChip T="string" Icon="@GetFileIcon(file.ContentType)" Size="Size.Small"
+                                     OnClose="() => RemoveFile(file)">
+                                @file.Name (@FormatFileSize(file.Size))
+                            </MudChip>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+
+            <MudStack Row="true" AlignItems="AlignItems.End" Spacing="1">
+                <MudTextField @bind-Value="userInput"
+                              Label="Type your message..."
+                              Variant="Variant.Outlined"
+                              Lines="1"
+                              AutoGrow="true"
+                              MaxLines="5"
+                              FullWidth="true"
+                              Disabled="@_isSending"
+                              OnKeyDown="@HandleKeyDown"
+                              Class="flex-grow-1"/>
+
+                <MudTooltip Text="Attach files">
+                    <MudFileUpload T="IBrowserFile" FilesChanged="HandleFilesSelected" Disabled="@_isSending">
+                        <ActivatorContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.AttachFile" Disabled="@_isSending"/>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </MudTooltip>
+
+                <MudTooltip Text="Send message (Ctrl/Cmd + Enter)">
+                    <span>
+                        <MudIconButton Icon="@Icons.Material.Filled.Send"
+                                       Color="Color.Primary"
+                                       OnClick="@SendMessageAsync"
+                                       Disabled="@(string.IsNullOrWhiteSpace(userInput) || _isSending)"/>
+                    </span>
+                </MudTooltip>
+            </MudStack>
+            <MudText Typo="Typo.caption" Align="Align.Right" Class="pr-2">Ctrl/Cmd + Enter to send</MudText>
+        </MudPaper>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private const long maxFileSize = 10 * 1024 * 1024; // 10 MB
+    private List<ChatMessage> messages = new();
+    private string userInput = "";
+    private string _conversationId = Guid.NewGuid().ToString();
+    private bool _isSending;
+
+    private List<FileAttachment> attachedFiles = new();
+    private Dictionary<ChatMessage, List<FileAttachment>> attachmentsByMessage = new();
+    private string ThreadString = "";
+    private string selectedReasoningLevel = "Medium";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_isSending || firstRender)
+        {
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && (e.CtrlKey || e.MetaKey))
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private async Task HandleFilesSelected(IBrowserFile file)
+    {
+        if (file.Size > maxFileSize)
+        {
+            Snackbar.Add($"File {file.Name} is too large. Maximum size is 10 MB.", Severity.Warning);
+            return;
+        }
+
+        var fileAttachment = new FileAttachment
+        {
+            Name = file.Name,
+            Size = file.Size,
+            ContentType = file.ContentType,
+            BrowserFile = file
+        };
+
+        attachedFiles.Add(fileAttachment);
+        Snackbar.Add($"Attached {file.Name}", Severity.Success);
+        StateHasChanged();
+    }
+
+    private void RemoveFile(FileAttachment file)
+    {
+        attachedFiles.Remove(file);
+        StateHasChanged();
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || _isSending) return;
+
+        _isSending = true;
+
+        var userMessage = new ChatMessage(ChatRole.User, userInput);
+        messages.Add(userMessage);
+
+        var serviceAttachments = new List<ChatFileAttachment>();
+
+        if (attachedFiles.Any())
+        {
+            attachmentsByMessage[userMessage] = new List<FileAttachment>(attachedFiles);
+
+            foreach (var file in attachedFiles)
+            {
+                await using var stream = file.BrowserFile.OpenReadStream(maxFileSize);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                serviceAttachments.Add(new ChatFileAttachment
+                {
+                    Name = file.Name,
+                    ContentType = file.ContentType,
+                    Data = ms.ToArray()
+                });
+            }
+        }
+
+        var currentInput = userInput;
+        userInput = "";
+        attachedFiles.Clear();
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            CustomChatResponse? response = await AiService.ChatAsync(
+                currentInput, 
+                _conversationId, 
+                serviceAttachments, 
+                threadString: ThreadString,
+                reasoningEffortLevel: selectedReasoningLevel);
+            ChatMessage? assistantMessage = new ChatMessage(ChatRole.Assistant, response?.Response);
+            messages.Add(assistantMessage);
+            if (response != null)
+            {
+                ThreadString = response.ThreadString;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSending = false;
+            await InvokeAsync(StateHasChanged);
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task SaveConversationAsync()
+    {
+        if (messages.Any())
+        {
+            await AiService.SaveChatHistoryAsync(_conversationId, messages);
+        }
+    }
+
+    private async Task ResetConversationAsync()
+    {
+        messages.Clear();
+        attachedFiles.Clear();
+        attachmentsByMessage.Clear();
+        userInput = "";
+        _conversationId = Guid.NewGuid().ToString();
+        StateHasChanged();
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        await AiService.IngestDocumentsAsync();
+        Snackbar.Add("Documents loaded successfully", Severity.Success);
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "document.getElementById('chat-messages')?.scrollTo(0, document.getElementById('chat-messages').scrollHeight)");
+        }
+        catch (JSException)
+        {
+            // Ignore JS errors
+        }
+    }
+
+    private string GetFileIcon(string contentType) => contentType switch
+    {
+        var ct when ct.Contains("pdf") => Icons.Material.Filled.PictureAsPdf,
+        var ct when ct.Contains("image") => Icons.Material.Filled.Image,
+        var ct when ct.Contains("word") || ct.Contains("doc") => Icons.Material.Filled.Description,
+        var ct when ct.Contains("text") => Icons.Material.Filled.TextSnippet,
+        var ct when ct.Contains("spreadsheet") || ct.Contains("excel") => Icons.Material.Filled.TableChart,
+        _ => Icons.Material.Filled.InsertDriveFile
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        const int k = 1024;
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        var i = (int)Math.Floor(Math.Log(bytes) / Math.Log(k));
+        return $"{bytes / Math.Pow(k, i):0.##} {sizes[i]}";
+    }
+
+    public void Dispose()
+    {
+        // If there's an ongoing conversation, we might want to save it.
+        if (messages.Any())
+        {
+            // Consider if this should be awaited or run synchronously.
+            // For Dispose, it's tricky.
+            _ = AiService.SaveChatHistoryAsync(_conversationId, messages);
+        }
+    }
+
+    private class FileAttachment
+    {
+        public string Name { get; set; } = "";
+        public long Size { get; set; }
+        public string ContentType { get; set; } = "";
+        public required IBrowserFile BrowserFile { get; set; }
+    }
+
+}
