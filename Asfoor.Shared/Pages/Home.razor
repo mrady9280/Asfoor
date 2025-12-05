@@ -1,6 +1,4 @@
-﻿@page "/modern-chat"
-@using Asfoor.Shared.Services
-@inject IFormFactor FormFactor
+﻿@page "/"
 
 <PageTitle>Home</PageTitle>
 
@@ -59,10 +57,3 @@
         More details
     </MudLink>
 </MudText>
-
-Welcome to your new app running on <em>@factor</em> using <em>@platform</em>.
-
-@code {
-    private string factor => FormFactor.GetFormFactor();
-    private string platform => FormFactor.GetPlatform();
-}

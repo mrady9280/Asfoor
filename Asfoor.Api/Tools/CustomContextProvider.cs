@@ -13,7 +13,7 @@ public class CustomContextProvider : AIContextProvider
     public CustomContextProvider(ChatClientAgent memoryExtractorAgent, IConfiguration configuration, string userId)
     {
         _memoryExtractorAgent = memoryExtractorAgent;
-        _userMemoryFilePath = Path.Combine(configuration["docPath"], $"{userId}.txt");
+        _userMemoryFilePath = Path.Combine(configuration["docPath"] ?? throw new InvalidOperationException(), $"{userId}.txt");
         if (File.Exists(_userMemoryFilePath))
         {
             _userFacts.AddRange(File.ReadAllLines(_userMemoryFilePath));
