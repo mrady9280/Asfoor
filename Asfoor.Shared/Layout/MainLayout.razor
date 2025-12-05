@@ -7,7 +7,7 @@
 <MudSnackbarProvider/>
 <MudLayout>
     <MudAppBar Elevation="1" Color="Color.Default">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())"/>
+        @* <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())"/> *@
         <MudText Typo="Typo.h5" Class="ml-3">Asfoor</MudText> <br/>
         <MudSpacer/>
         <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" Class="mr-2"/>
@@ -18,7 +18,7 @@
     @* <MudDrawer id="nav-drawer" @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2"> *@
     @*     <NavMenu/> *@
     @* </MudDrawer> *@
-    <MudMainContent Class="pt-16 pa-4">
+    <MudMainContent Class="pt-16">
         @Body
     </MudMainContent>
 </MudLayout>
@@ -74,7 +74,7 @@
         Background = "#1a1a27",
         BackgroundGray = "#151521",
         AppbarText = "#92929f",
-        AppbarBackground = "rgba(26,26,39,0.8)",
+        AppbarBackground = "#1a1a27",
         DrawerBackground = "#1a1a27",
         ActionDefault = "#74718e",
         ActionDisabled = "#9999994d",

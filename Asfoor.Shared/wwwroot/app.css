@@ -2,6 +2,7 @@
 html,
 body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background-color: var(--mud-palette-background, #f7f7f7);
 }
 
 a,

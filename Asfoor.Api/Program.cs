@@ -16,8 +16,6 @@ builder.Services.AddOpenApi();
 var config = new ConfigurationBuilder()
     .AddEnvironmentVariables()
     .Build();
-
-
 var client = new OpenAIClient(new ApiKeyCredential(config["apiKey"] ?? throw new InvalidOperationException()),
     new OpenAIClientOptions()
     {
