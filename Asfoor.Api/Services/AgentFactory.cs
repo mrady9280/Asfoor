@@ -48,24 +48,24 @@ public class AgentFactory : IAgentFactory
     public async Task<AIAgent> CreateChatAgentAsync(ChatRequest request)
     {
         var reasoningLevel = request.ReasoningEffortLevel ?? ChatServiceConstants.DefaultReasoningEffortLevel;
-        return await CreateChatAgentWithToolsAsync(reasoningLevel);
+        return await CreateChatAgentWithToolsAsync(request.Attachments, reasoningLevel);
     }
 
     /// <summary>
     /// Creates a chat agent with search tools and memory capabilities.
     /// </summary>
+    /// <param name="attachments">The list of file attachments (images) from the request.</param>
     /// <param name="reasoningEffortLevel">The reasoning effort level to use for the agent.</param>
     [Experimental("OPENAI001")]
-    private async Task<AIAgent> CreateChatAgentWithToolsAsync(string? reasoningEffortLevel = null)
+    private async Task<AIAgent> CreateChatAgentWithToolsAsync(List<ChatFileAttachment> attachments, string? reasoningEffortLevel = null)
     {
         _logger.LogDebug("Creating chat agent with tools with reasoning level: {ReasoningLevel}", reasoningEffortLevel);
 
-        var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync,"search-tool");
+        var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync, "search-tool");
+        var analyzeImagesFunc = AIFunctionFactory.Create(_tools.CreateAnalyzeImagesFunc(attachments), "AnalyzeImages", "Analyzes attached images to answer questions about them. Use this tool when the user asks about the images they sent.");
+
         var parsedReasoningLevel = ParseReasoningEffortLevel(reasoningEffortLevel);
         var memoryAgent = CreateMemoryAgent(parsedReasoningLevel);
-        var imageAgent = _openAiClient.GetChatClient(_imageModel)
-            .AsIChatClient()
-            .CreateAIAgent();
 
         var agent = _openAiClient
             .GetChatClient(_chatModel)
@@ -81,7 +81,7 @@ public class AgentFactory : IAgentFactory
                         ChatServiceConstants.DefaultUserId),
                     ChatOptions = new ChatOptions
                     {
-                        Tools = [searchFunc, imageAgent.AsAIFunction()],
+                        Tools = [searchFunc, analyzeImagesFunc],
                         RawRepresentationFactory = _ => new ChatCompletionOptions
                         {
 #pragma warning disable OPENAI001
@@ -94,7 +94,7 @@ public class AgentFactory : IAgentFactory
             .UseOpenTelemetry()
             .Use((agent, context, next, ct) =>
                 Middlewares.FunctionCallMiddleware(agent, context, next, ct,
-                    _logger)) // Note: Logger type mismatch potentially, Middlewares expecting ILogger?
+                    _logger)) 
             .Build();
 
         return await Task.FromResult(agent);

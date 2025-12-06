@@ -89,6 +89,9 @@ public class ChatService : IChatService
     /// <summary>
     /// Creates a user message from the chat request.
     /// </summary>
+    /// <summary>
+    /// Creates a user message from the chat request.
+    /// </summary>
     private ChatMessage CreateUserMessage(ChatRequest request)
     {
         if (!request.Attachments.Any())
@@ -96,14 +99,12 @@ public class ChatService : IChatService
             return new ChatMessage(ChatRole.User, request.Message);
         }
 
-        var contents = new List<AIContent> { new TextContent(request.Message) };
-
-        foreach (var attachment in request.Attachments)
-        {
-            contents.Add(new DataContent(attachment.Data, attachment.ContentType));
-        }
-
-        return new ChatMessage(ChatRole.User, contents);
+        // For requests with attachments, we don't send the data directly to the main reasoning agent.
+        // Instead, we inform it about the attachments so it can decide to use the AnalyzeImages tool.
+        var messageWithNotification = request.Message + 
+                                      $"\n\n[System Notification: The user has attached {request.Attachments.Count} image(s). Use the 'AnalyzeImages' tool to inspect them if necessary.]";
+        
+        return new ChatMessage(ChatRole.User, messageWithNotification);
     }
 
     #endregion
