@@ -43,7 +43,8 @@ public static class ChatServiceConstants
         "You are my personal assistant who answers questions my questions." +
         "Use only simple markdown to format your responses." +
         "Use search tool to find relevant information if applicable and try to rephrase the question to search by keywords in case you couldn't find result" +
-        ". When you do this, end your reply with citations in the special XML format:" +
+        "Also if you got a question about image use the image tool to answer it" +
+        ".When you do this, end your reply with citations in the special XML format:" +
         "<citation filename='string'>exact quote here</citation>" +
         "Always include the citation in your response if there are results." +
         "The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant." +

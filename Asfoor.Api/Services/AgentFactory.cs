@@ -11,7 +11,6 @@ namespace Asfoor.Api.Services;
 public interface IAgentFactory
 {
     Task<AIAgent> CreateChatAgentAsync(ChatRequest request);
-    Task<AIAgent> CreateImageAgentAsync(ChatRequest request);
 }
 
 public class AgentFactory : IAgentFactory
@@ -53,19 +52,6 @@ public class AgentFactory : IAgentFactory
     }
 
     /// <summary>
-    /// Creates an agent for processing requests with image attachments.
-    /// </summary>
-    public async Task<AIAgent> CreateImageAgentAsync(ChatRequest request)
-    {
-        _logger.LogDebug("Creating image processing agent");
-
-        return await Task.FromResult<AIAgent>(
-            _openAiClient.GetChatClient(_imageModel)
-                .AsIChatClient()
-                .CreateAIAgent());
-    }
-
-    /// <summary>
     /// Creates a chat agent with search tools and memory capabilities.
     /// </summary>
     /// <param name="reasoningEffortLevel">The reasoning effort level to use for the agent.</param>
@@ -74,9 +60,12 @@ public class AgentFactory : IAgentFactory
     {
         _logger.LogDebug("Creating chat agent with tools with reasoning level: {ReasoningLevel}", reasoningEffortLevel);
 
-        var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync);
+        var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync,"search-tool");
         var parsedReasoningLevel = ParseReasoningEffortLevel(reasoningEffortLevel);
         var memoryAgent = CreateMemoryAgent(parsedReasoningLevel);
+        var imageAgent = _openAiClient.GetChatClient(_imageModel)
+            .AsIChatClient()
+            .CreateAIAgent();
 
         var agent = _openAiClient
             .GetChatClient(_chatModel)
@@ -92,7 +81,7 @@ public class AgentFactory : IAgentFactory
                         ChatServiceConstants.DefaultUserId),
                     ChatOptions = new ChatOptions
                     {
-                        Tools = [searchFunc],
+                        Tools = [searchFunc, imageAgent.AsAIFunction()],
                         RawRepresentationFactory = _ => new ChatCompletionOptions
                         {
 #pragma warning disable OPENAI001

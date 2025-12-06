@@ -4,7 +4,6 @@ using Asfoor.Api.Services;
 using Asfoor.Api.Services.Ingestion;
 using Asfoor.Api.Tools;
 using Microsoft.Agents.AI;
-using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
