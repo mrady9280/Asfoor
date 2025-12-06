@@ -18,12 +18,8 @@ public class ChatService : IChatService
 {
     #region Fields
 
-    private readonly OpenAIClient _openAiClient;
-    private readonly IConfiguration _configuration;
-    private readonly Tools.Tools _tools;
+    private readonly IAgentFactory _agentFactory;
     private readonly ILogger<ChatService> _logger;
-    private readonly string _chatModel;
-    private readonly string _imageModel;
 
     #endregion
 
@@ -32,28 +28,14 @@ public class ChatService : IChatService
     /// <summary>
     /// Initializes a new instance of the <see cref="ChatService"/> class.
     /// </summary>
-    /// <param name="openAiClient">The OpenAI client for AI operations.</param>
-    /// <param name="configuration">Application configuration.</param>
-    /// <param name="tools">Tools available to the AI agent.</param>
+    /// <param name="agentFactory">The factory for creating AI agents.</param>
     /// <param name="logger">Logger for diagnostic information.</param>
     public ChatService(
-        OpenAIClient openAiClient,
-        IConfiguration configuration,
-        Tools.Tools tools,
+        IAgentFactory agentFactory,
         ILogger<ChatService> logger)
     {
-        _openAiClient = openAiClient ?? throw new ArgumentNullException(nameof(openAiClient));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _tools = tools ?? throw new ArgumentNullException(nameof(tools));
+        _agentFactory = agentFactory ?? throw new ArgumentNullException(nameof(agentFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // Cache frequently accessed configuration values
-        _chatModel = _configuration[ChatServiceConstants.ChatModelConfigKey]
-                     ?? throw new InvalidOperationException(
-                         $"Configuration key '{ChatServiceConstants.ChatModelConfigKey}' is missing.");
-        _imageModel = _configuration[ChatServiceConstants.ImageModelConfigKey]
-                      ?? throw new InvalidOperationException(
-                          $"Configuration key '{ChatServiceConstants.ImageModelConfigKey}' is missing.");
     }
 
     #endregion
@@ -82,7 +64,7 @@ public class ChatService : IChatService
 
             // Create appropriate user message and agent based on request type
             var userMessage = CreateUserMessage(request);
-            var agent = await CreateAgentForRequestAsync(request);
+            var agent = await _agentFactory.CreateChatAgentAsync(request);
 
             // Get or deserialize thread
             var thread = GetOrCreateThread(agent, request.ThreadString);
@@ -122,107 +104,6 @@ public class ChatService : IChatService
         }
 
         return new ChatMessage(ChatRole.User, contents);
-    }
-
-    #endregion
-
-    #region Private Methods - Agent Creation
-
-    /// <summary>
-    /// Creates the appropriate agent based on the request type (with or without attachments).
-    /// </summary>
-    [Experimental("OPENAI001")]
-    private async Task<AIAgent> CreateAgentForRequestAsync(ChatRequest request)
-    {
-        var reasoningLevel = request.ReasoningEffortLevel ?? ChatServiceConstants.DefaultReasoningEffortLevel;
-        return request.Attachments.Any()
-            ? CreateImageAgent()
-            : await CreateChatAgentWithToolsAsync(reasoningLevel);
-    }
-
-    /// <summary>
-    /// Creates an agent for processing requests with image attachments.
-    /// </summary>
-    private AIAgent CreateImageAgent()
-    {
-        _logger.LogDebug("Creating image processing agent");
-
-        return _openAiClient
-            .GetChatClient(_imageModel)
-            .AsIChatClient()
-            .CreateAIAgent();
-    }
-
-    /// <summary>
-    /// Creates a chat agent with search tools and memory capabilities.
-    /// </summary>
-    /// <param name="reasoningEffortLevel">The reasoning effort level to use for the agent.</param>
-    [Experimental("OPENAI001")]
-    private async Task<AIAgent> CreateChatAgentWithToolsAsync(string? reasoningEffortLevel = null)
-    {
-        _logger.LogDebug("Creating chat agent with tools with reasoning level: {ReasoningLevel}", reasoningEffortLevel);
-
-        var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync);
-        var parsedReasoningLevel = ParseReasoningEffortLevel(reasoningEffortLevel);
-        var memoryAgent = CreateMemoryAgent(parsedReasoningLevel);
-
-        var agent = _openAiClient
-            .GetChatClient(_chatModel)
-            .AsIChatClient()
-            .CreateAIAgent(
-                options: new ChatClientAgentOptions
-                {
-                    Instructions = ChatServiceConstants.ChatAgentInstructions,
-                    Name = ChatServiceConstants.ChatAgentName,
-                    AIContextProviderFactory = _ => new CustomContextProvider(
-                        memoryAgent,
-                        _configuration,
-                        ChatServiceConstants.DefaultUserId),
-                    ChatOptions = new ChatOptions
-                    {
-                        Tools = [searchFunc],
-                        RawRepresentationFactory = _ => new ChatCompletionOptions
-                        {
-#pragma warning disable OPENAI001
-                            ReasoningEffortLevel = parsedReasoningLevel
-#pragma warning restore OPENAI001
-                        },
-                    }
-                })
-            .AsBuilder()
-            .UseOpenTelemetry()
-            .Use((agent, context, next, ct) =>
-                Middlewares.FunctionCallMiddleware(agent, context, next, ct, _logger))
-            .Build();
-
-        return await Task.FromResult(agent);
-    }
-
-    /// <summary>
-    /// Creates an agent for extracting and managing user memory.
-    /// </summary>
-    [Experimental("OPENAI001")]
-    private ChatClientAgent CreateMemoryAgent(ChatReasoningEffortLevel reasoningEffortLevel)
-    {
-        _logger.LogDebug("Creating memory extraction agent");
-
-        return _openAiClient
-            .GetChatClient(_chatModel)
-            .AsIChatClient()
-            .CreateAIAgent(
-                options: new ChatClientAgentOptions
-                {
-                    Instructions = ChatServiceConstants.MemoryAgentInstructions,
-                    ChatOptions = new ChatOptions
-                    {
-                        RawRepresentationFactory = _ => new ChatCompletionOptions
-                        {
-#pragma warning disable OPENAI001
-                            ReasoningEffortLevel = reasoningEffortLevel
-#pragma warning restore OPENAI001
-                        },
-                    }
-                });
     }
 
     #endregion
@@ -284,29 +165,6 @@ public class ChatService : IChatService
             Usage = usageLog
         };
     }
-
-    #endregion
-
-    #region Private Methods - Helpers
-
-    /// <summary>
-    /// Parses the reasoning effort level string to the corresponding enum value.
-    /// </summary>
-    /// <param name="level">The reasoning effort level as a string.</param>
-    /// <returns>The corresponding ChatReasoningEffortLevel enum value.</returns>
-#pragma warning disable OPENAI001
-    private static ChatReasoningEffortLevel ParseReasoningEffortLevel(string? level)
-    {
-        return level?.ToLowerInvariant() switch
-        {
-            "low" => ChatReasoningEffortLevel.Low,
-            "medium" => ChatReasoningEffortLevel.Medium,
-            "high" => ChatReasoningEffortLevel.High,
-            "minimal" => ChatReasoningEffortLevel.Minimal,
-            _ => ChatReasoningEffortLevel.Medium // Default to Medium
-        };
-    }
-#pragma warning restore OPENAI001
 
     #endregion
 

@@ -3,8 +3,11 @@ using Asfoo.Models;
 using Asfoor.Api.Services;
 using Asfoor.Api.Services.Ingestion;
 using Asfoor.Api.Tools;
+using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using OpenAI.Chat;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +29,8 @@ builder.Services.AddSingleton<OpenAIClient>(sp => client);
 var embeddingGenerator = client.GetEmbeddingClient(config["embeddingModel"]).AsIEmbeddingGenerator();
 builder.Services.AddEmbeddingGenerator(embeddingGenerator);
 
+// builder.Services.AddAGUI();
+
 
 builder.AddQdrantClient("vectordb");
 builder.Services.AddQdrantVectorStore();
@@ -35,9 +40,12 @@ builder.Services.AddSingleton<ChatHistoryIngestor>();
 builder.Services.AddSingleton<DocumentIngestor>();
 builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddSingleton<Tools>();
+builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<IChatService, ChatService>();
 builder.Services.AddKeyedSingleton("ingestion_directory",
     new DirectoryInfo(config["docPath"] ?? throw new InvalidOperationException()));
+
+
 var app = builder.Build();
 
 
@@ -72,6 +80,8 @@ app.MapPost("/chat/history", async (ChatHistory request, ChatHistoryIngestor ing
     // await ingestor.IngestThreadAsync(request.ConversationId, request.Messages);
     return Results.Ok();
 });
+
+// app.MapAGUI("text-chat", agent);
 app.MapDefaultEndpoints();
 
-app.Run();
+await app.RunAsync();
