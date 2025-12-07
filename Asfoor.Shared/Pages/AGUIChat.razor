@@ -5,6 +5,7 @@
 @using Microsoft.Agents.AI.AGUI
 @using Microsoft.Extensions.AI
 @using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.Components.Forms
 @inject NavigationManager Nav
 @inject IConfiguration Configuration
 @inject IJSRuntime JS
@@ -60,6 +61,19 @@
 
                         <MudPaper Elevation="2" Class="pa-3" Style="max-width: 70%;">
                             <MudText Typo="Typo.body1" Style="white-space: pre-wrap; word-wrap: break-word;">@message.Text</MudText>
+
+                            @if (attachmentsByMessage.ContainsKey(message))
+                            {
+                                <MudStack Row="true" Class="mt-2" Style="flex-wrap: wrap;" Spacing="1">
+                                    @foreach (var file in attachmentsByMessage[message])
+                                    {
+                                        <MudChip T="string" Icon="@GetFileIcon(file.ContentType)" Size="Size.Small"
+                                                 Variant="Variant.Outlined">
+                                            @file.Name (@FormatFileSize(file.Size))
+                                        </MudChip>
+                                    }
+                                </MudStack>
+                            }
                         </MudPaper>
 
                         @if (message.Role == ChatRole.User)
@@ -94,6 +108,22 @@
 
         @* Input area *@
         <div class="pa-2">
+             @if (attachedFiles.Any())
+            {
+                <MudPaper Outlined="true" Class="mb-2 pa-2">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Style="flex-wrap: wrap;">
+                        <MudText Typo="Typo.caption" Style="font-weight: 600;">Attached:</MudText>
+                        @foreach (var file in attachedFiles)
+                        {
+                            <MudChip T="string" Icon="@GetFileIcon(file.ContentType)" Size="Size.Small"
+                                     OnClose="() => RemoveFile(file)">
+                                @file.Name (@FormatFileSize(file.Size))
+                            </MudChip>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+            
             <MudStack Row="true" AlignItems="AlignItems.End" Spacing="1">
                 <MudTextField @bind-Value="userInput"
                               Label="Type your message..."
@@ -104,12 +134,20 @@
                               Disabled="@(currentResponseMessage != null)"
                               OnKeyDown="@HandleKeyDown" />
 
+                <MudTooltip Text="Attach files">
+                    <MudFileUpload T="IBrowserFile" FilesChanged="HandleFilesSelected" Disabled="@(currentResponseMessage != null)">
+                        <ActivatorContent>
+                            <MudIconButton Icon="@Icons.Material.Filled.AttachFile" Disabled="@(currentResponseMessage != null)"/>
+                        </ActivatorContent>
+                    </MudFileUpload>
+                </MudTooltip>
+
                 <MudTooltip Text="Send message (Enter)">
                     <span>
                         <MudIconButton Icon="@Icons.Material.Filled.Send"
                                        Color="Color.Primary"
                                        OnClick="@SendMessageAsync"
-                                       Disabled="@(string.IsNullOrWhiteSpace(userInput) || currentResponseMessage != null)" />
+                                       Disabled="@((string.IsNullOrWhiteSpace(userInput) && !attachedFiles.Any()) || currentResponseMessage != null)" />
                     </span>
                 </MudTooltip>
             </MudStack>
@@ -118,9 +156,15 @@
 </MudContainer>
 
 @code {
+    private const long maxFileSize = 10 * 1024 * 1024; // 10 MB
     private int statefulMessageCount;
     private readonly ChatOptions chatOptions = new();
     private readonly List<ChatMessage> messages = new();
+     // Keep track of attachments separately for display purposes if needed, OR relies on ChatMessage contents?
+    // ModernChat kept a separate dictionary for display because standard ChatMessage text doesn't show files.
+    private Dictionary<ChatMessage, List<FileAttachment>> attachmentsByMessage = new();
+    private List<FileAttachment> attachedFiles = new();
+    
     private CancellationTokenSource? currentResponseCancellation;
     private ChatMessage? currentResponseMessage;
     private string userInput = "";
@@ -154,12 +198,76 @@
         }
     }
 
+    private async Task HandleFilesSelected(IBrowserFile file)
+    {
+        if (file.Size > maxFileSize)
+        {
+            Snackbar.Add($"File {file.Name} is too large. Maximum size is 10 MB.", Severity.Warning);
+            return;
+        }
+
+        var fileAttachment = new FileAttachment
+        {
+            Name = file.Name,
+            Size = file.Size,
+            ContentType = file.ContentType,
+            BrowserFile = file
+        };
+
+        attachedFiles.Add(fileAttachment);
+        Snackbar.Add($"Attached {file.Name}", Severity.Success);
+        StateHasChanged();
+    }
+
+    private void RemoveFile(FileAttachment file)
+    {
+        attachedFiles.Remove(file);
+        StateHasChanged();
+    }
+
+
     private async Task SendMessageAsync()
     {
-        if (string.IsNullOrWhiteSpace(userInput)) return;
+        if ((string.IsNullOrWhiteSpace(userInput) && !attachedFiles.Any())) return;
 
-        var userMsg = new ChatMessage(ChatRole.User, userInput);
+        // Construct the message contet
+        var items = new List<AIContent>();
+        if (!string.IsNullOrWhiteSpace(userInput)) 
+        {
+             items.Add(new TextContent(userInput));
+        }
+        
+        // Add attached files as DataContent
+        if (attachedFiles.Any())
+        {
+            foreach (var file in attachedFiles)
+            {
+                try 
+                {
+                    await using var stream = file.BrowserFile.OpenReadStream(maxFileSize);
+                    using var ms = new MemoryStream();
+                    await stream.CopyToAsync(ms);
+                    // Use DataContent for generic file data
+                    items.Add(new DataContent(ms.ToArray(), file.ContentType));
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Failed to read file {file.Name}: {ex.Message}", Severity.Error);
+                    return; // Stop sending if file read fails
+                }
+            }
+        }
+
+        var userMsg = new ChatMessage(ChatRole.User, items);
+        
+        // Store attachments for UI display (since DataContent isn't easily rendered as a chip in the loop without logic)
+        if (attachedFiles.Any())
+        {
+            attachmentsByMessage[userMsg] = new List<FileAttachment>(attachedFiles);
+        }
+        
         userInput = ""; // Clear input immediately
+        attachedFiles.Clear();
         await AddUserMessageAsync(userMsg);
     }
 
@@ -188,6 +296,12 @@
                             messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [textContent]), filter: c => c is not TextContent);
                             responseText.Text += update.Text;
                             break;
+                            
+                        // Revert to simpler logic (as requested previously) for functional calls:
+                        // Just append text representation if possible or ignore if not supported by UI request.
+                        // But wait, the previous revert kept the logic that added text representation to messages!
+                        // Let's ensure we maintain that compatibility.
+                        
                         case FunctionCallContent functionCallContent:
                             StringBuilder toolCallDetails = new();
                             toolCallDetails.Append($"[Tool Call: {functionCallContent.Name}");
@@ -195,17 +309,21 @@
                             {
                                 toolCallDetails.Append($" (Args: {string.Join(",", functionCallContent.Arguments.Select(x => $"[{x.Key} = {x.Value}]"))}");
                             }
-
                             toolCallDetails.Append("]");
+                            // Add as TextContent so it shows up in the chat bubble
                             messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(toolCallDetails.ToString())]), filter: c => c is not TextContent);
                             break;
+                            
                         case FunctionResultContent functionResultContent:
                             bool isError = functionResultContent.Exception != null;
                             var y = isError ? $"[Tool Error: {functionResultContent.Exception}]" : $"[Tool Result: {functionResultContent.Result}]";
+                             // Add as TextContent
                             messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(y)]), filter: c => c is not TextContent);
                             break;
+                            
                         case ErrorContent errorContent:
                             var x = $"[Error: {errorContent.Message}]";
+                             // Add as TextContent
                             messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(x)]), filter: c => c is not TextContent);
                             break;
                     }
@@ -249,6 +367,8 @@
         chatOptions.ConversationId = null;
         statefulMessageCount = 0;
         userInput = "";
+        attachedFiles.Clear(); 
+        attachmentsByMessage.Clear();
         StateHasChanged();
     }
 
@@ -263,8 +383,35 @@
             // Ignore JS errors
         }
     }
+    
+    private string GetFileIcon(string contentType) => contentType switch
+    {
+        var ct when ct.Contains("pdf") => Icons.Material.Filled.PictureAsPdf,
+        var ct when ct.Contains("image") => Icons.Material.Filled.Image,
+        var ct when ct.Contains("word") || ct.Contains("doc") => Icons.Material.Filled.Description,
+        var ct when ct.Contains("text") => Icons.Material.Filled.TextSnippet,
+        var ct when ct.Contains("spreadsheet") || ct.Contains("excel") => Icons.Material.Filled.TableChart,
+        _ => Icons.Material.Filled.InsertDriveFile
+    };
+
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        const int k = 1024;
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        var i = (int)Math.Floor(Math.Log(bytes) / Math.Log(k));
+        return $"{bytes / Math.Pow(k, i):0.##} {sizes[i]}";
+    }
 
     public void Dispose()
         => currentResponseCancellation?.Cancel();
+        
+    private class FileAttachment
+    {
+        public string Name { get; set; } = "";
+        public long Size { get; set; }
+        public string ContentType { get; set; } = "";
+        public required IBrowserFile BrowserFile { get; set; }
+    }
 
 }
