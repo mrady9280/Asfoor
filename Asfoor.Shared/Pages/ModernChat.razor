@@ -5,6 +5,7 @@
 @inject IAiService AiService
 @inject IJSRuntime JS
 @inject ISnackbar Snackbar
+@inject NavigationManager Nav
 @implements IDisposable
 
 <PageTitle>Modern Chat</PageTitle>
@@ -39,6 +40,9 @@
                     </MudTooltip>
                     <MudTooltip Text="Save conversation">
                         <MudIconButton Icon="@Icons.Material.Filled.Save" OnClick="@SaveConversationAsync"/>
+                    </MudTooltip>
+                    <MudTooltip Text="Switch to AGUI Chat">
+                        <MudIconButton Icon="@Icons.Material.Filled.Science" OnClick="@(() => Nav.NavigateTo("/agchat"))" />
                     </MudTooltip>
                 </MudStack>
             </MudStack>

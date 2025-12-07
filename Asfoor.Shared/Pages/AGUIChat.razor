@@ -7,42 +7,127 @@
 @using Microsoft.Extensions.Configuration
 @inject NavigationManager Nav
 @inject IConfiguration Configuration
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
 @implements IDisposable
 
-<PageTitle>Chat</PageTitle>
+<PageTitle>AGUI Chat</PageTitle>
 
-<ChatHeader OnNewChat="@ResetConversationAsync"/>
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-0 ma-0" Style="height: calc(100vh - 64px);">
+    <div class="d-flex flex-column mud-paper mud-theme-surface" style="height: 100%;">
 
-<ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
-    <NoMessagesContent>
-        <div>To get started, try asking about these example documents. You can replace these with your own data and
-            replace this message.
+        @* Header *@
+        <div class="pa-3">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6">AGUI Chat</MudText>
+                </MudStack>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudTooltip Text="Switch to Modern Chat">
+                        <MudIconButton Icon="@Icons.Material.Filled.Chat" OnClick="@(() => Nav.NavigateTo("/"))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Reset conversation">
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="@ResetConversationAsync" />
+                    </MudTooltip>
+                </MudStack>
+            </MudStack>
         </div>
-        <ChatCitation File="Example_Emergency_Survival_Kit.pdf"/>
-        <ChatCitation File="Example_GPS_Watch.md"/>
-    </NoMessagesContent>
-</ChatMessageList>
 
-<div class="chat-container">
-    @* <ChatSuggestions OnSelected="@AddUserMessageAsync" @ref="@chatSuggestions"/> *@
-    <ChatInput OnSend="@AddUserMessageAsync" @ref="@chatInput"/>
-    @* <SurveyPrompt/> $1$ Remove this line to eliminate the template survey message #1# *@
-</div>
+        @* Messages area *@
+        <div class="pa-4 flex-grow-1" id="chat-messages" style="overflow-y: auto;">
+            @if (!messages.Any() && currentResponseMessage == null)
+            {
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="h-100">
+                    <MudIcon Icon="@Icons.Material.Filled.ChatBubbleOutline" Size="Size.Large" Color="Color.Primary"
+                             Style="font-size: 4rem;" />
+                    <MudText Typo="Typo.h6" Color="Color.Primary">Start a Conversation</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Powered by AG-UI Agents</MudText>
+                </MudStack>
+            }
+            else
+            {
+                @foreach (var message in messages)
+                {
+                    <MudStack Row="true"
+                              Justify="@(message.Role == ChatRole.User ? Justify.FlexEnd : Justify.FlexStart)"
+                              Class="mb-4">
+                        @if (message.Role == ChatRole.Assistant)
+                        {
+                            <MudAvatar Color="Color.Secondary" Size="Size.Medium" Class="mr-2">
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+                            </MudAvatar>
+                        }
+
+                        <MudPaper Elevation="2" Class="pa-3" Style="max-width: 70%;">
+                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap; word-wrap: break-word;">@message.Text</MudText>
+                        </MudPaper>
+
+                        @if (message.Role == ChatRole.User)
+                        {
+                            <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="ml-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" />
+                            </MudAvatar>
+                        }
+                    </MudStack>
+                }
+
+                @if (currentResponseMessage != null)
+                {
+                    <MudStack Row="true" Justify="Justify.FlexStart" Class="mb-4">
+                        <MudAvatar Color="Color.Secondary" Size="Size.Medium" Class="mr-2">
+                            <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+                        </MudAvatar>
+                        <MudPaper Elevation="2" Class="pa-3" Style="max-width: 70%;">
+                             @if (!string.IsNullOrEmpty(currentResponseMessage.Text))
+                            {
+                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap; word-wrap: break-word;">@currentResponseMessage.Text</MudText>
+                            }
+                            @if (currentResponseMessage.Contents.Count == 0 || (currentResponseMessage.Contents.Count == 1 && string.IsNullOrEmpty(currentResponseMessage.Text)))
+                            {
+                                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="ml-2" />
+                            }
+                        </MudPaper>
+                    </MudStack>
+                }
+            }
+        </div>
+
+        @* Input area *@
+        <div class="pa-2">
+            <MudStack Row="true" AlignItems="AlignItems.End" Spacing="1">
+                <MudTextField @bind-Value="userInput"
+                              Label="Type your message..."
+                              Variant="Variant.Outlined"
+                              Immediate="true"
+                              Lines="1"
+                              FullWidth="true"
+                              Disabled="@(currentResponseMessage != null)"
+                              OnKeyDown="@HandleKeyDown" />
+
+                <MudTooltip Text="Send message (Enter)">
+                    <span>
+                        <MudIconButton Icon="@Icons.Material.Filled.Send"
+                                       Color="Color.Primary"
+                                       OnClick="@SendMessageAsync"
+                                       Disabled="@(string.IsNullOrWhiteSpace(userInput) || currentResponseMessage != null)" />
+                    </span>
+                </MudTooltip>
+            </MudStack>
+        </div>
+    </div>
+</MudContainer>
 
 @code {
-
-
     private int statefulMessageCount;
     private readonly ChatOptions chatOptions = new();
     private readonly List<ChatMessage> messages = new();
     private CancellationTokenSource? currentResponseCancellation;
     private ChatMessage? currentResponseMessage;
-    private ChatInput? chatInput;
-    private ChatSuggestions? chatSuggestions;
+    private string userInput = "";
+
     AIAgent? _agent;
     HttpClient? _httpClient;
     AGUIChatClient? _chatClient;
-    private ChatMessage? _currentResponseMessage;
 
     protected override void OnInitialized()
     {
@@ -50,7 +135,32 @@
         _httpClient = new HttpClient();
         string apiBaseAddress = Configuration["API_HTTP"] + "/agchat";
         _chatClient = new AGUIChatClient(_httpClient, apiBaseAddress);
-        _agent = _chatClient.CreateAIAgent();
+        _agent = _chatClient!.CreateAIAgent();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (currentResponseMessage != null || firstRender)
+        {
+            await ScrollToBottom();
+        }
+    }
+
+     private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessageAsync();
+        }
+    }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(userInput)) return;
+
+        var userMsg = new ChatMessage(ChatRole.User, userInput);
+        userInput = ""; // Clear input immediately
+        await AddUserMessageAsync(userMsg);
     }
 
     private async Task AddUserMessageAsync(ChatMessage userMessage)
@@ -58,53 +168,66 @@
         CancelAnyCurrentResponse();
         // Add the user message to the conversation
         messages.Add(userMessage);
-        // chatSuggestions?.Clear();
-        await chatInput!.FocusAsync();
+        
         // Stream and display a new response from the IChatClient
         var responseText = new TextContent("");
         currentResponseMessage = new ChatMessage(ChatRole.Assistant, [responseText]);
         currentResponseCancellation = new();
-        await foreach (AgentRunResponseUpdate update in _agent.RunStreamingAsync(messages.Skip(statefulMessageCount)))
+        StateHasChanged();
+        await ScrollToBottom();
+
+        try 
         {
-            foreach (AIContent content in update.Contents)
+            await foreach (AgentRunResponseUpdate update in _agent!.RunStreamingAsync(messages.Skip(statefulMessageCount)))
             {
-                switch (content)
+                foreach (AIContent content in update.Contents)
                 {
-                    case TextContent textContent:
-                        messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [textContent]), filter: c => c is not TextContent);
-                        responseText.Text += update.Text;
-                        ChatMessageItem.NotifyChanged(currentResponseMessage);
-                        break;
-                    case FunctionCallContent functionCallContent:
-                        StringBuilder toolCallDetails = new();
-                        toolCallDetails.Append($"[Tool Call: {functionCallContent.Name}");
-                        if (functionCallContent.Arguments.Any())
-                        {
-                            toolCallDetails.Append($" (Args: {string.Join(",", functionCallContent.Arguments.Select(x => $"[{x.Key} = {x.Value}]"))}");
-                        }
+                    switch (content)
+                    {
+                        case TextContent textContent:
+                            messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [textContent]), filter: c => c is not TextContent);
+                            responseText.Text += update.Text;
+                            break;
+                        case FunctionCallContent functionCallContent:
+                            StringBuilder toolCallDetails = new();
+                            toolCallDetails.Append($"[Tool Call: {functionCallContent.Name}");
+                            if (functionCallContent.Arguments != null && functionCallContent.Arguments.Any())
+                            {
+                                toolCallDetails.Append($" (Args: {string.Join(",", functionCallContent.Arguments.Select(x => $"[{x.Key} = {x.Value}]"))}");
+                            }
 
-                        toolCallDetails.Append("]");
-                        messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(toolCallDetails.ToString())]), filter: c => c is not TextContent);
-                        break;
-                    case FunctionResultContent functionResultContent:
-                        bool isError = functionResultContent.Exception != null;
-                        var y = isError ? $"[Tool Error: {functionResultContent.Exception}]" : $"[Tool Result: {functionResultContent.Result}]";
-                        messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(y)]), filter: c => c is not TextContent);
-                        break;
-                    case ErrorContent errorContent:
-                        var x = $"[Error: {errorContent.Message}]";
-                        messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(x)]), filter: c => c is not TextContent);
-                        break;
+                            toolCallDetails.Append("]");
+                            messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(toolCallDetails.ToString())]), filter: c => c is not TextContent);
+                            break;
+                        case FunctionResultContent functionResultContent:
+                            bool isError = functionResultContent.Exception != null;
+                            var y = isError ? $"[Tool Error: {functionResultContent.Exception}]" : $"[Tool Result: {functionResultContent.Result}]";
+                            messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(y)]), filter: c => c is not TextContent);
+                            break;
+                        case ErrorContent errorContent:
+                            var x = $"[Error: {errorContent.Message}]";
+                            messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [new TextContent(x)]), filter: c => c is not TextContent);
+                            break;
+                    }
                 }
+                StateHasChanged();
+                await ScrollToBottom();
             }
-            
-        }
 
-        // Store the final response in the conversation, and begin getting suggestions
-        messages.Add(currentResponseMessage!);
-        statefulMessageCount = chatOptions.ConversationId is not null ? messages.Count : 0;
-        currentResponseMessage = null;
-        // chatSuggestions?.Update(messages);
+            // Store the final response in the conversation
+            messages.Add(currentResponseMessage!);
+            statefulMessageCount = chatOptions.ConversationId is not null ? messages.Count : 0;
+            currentResponseMessage = null;
+        }
+        catch (Exception ex)
+        {
+             Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+             StateHasChanged();
+             await ScrollToBottom();
+        }
     }
 
     private void CancelAnyCurrentResponse()
@@ -125,8 +248,20 @@
         messages.Clear();
         chatOptions.ConversationId = null;
         statefulMessageCount = 0;
-        // chatSuggestions?.Clear();
-        await chatInput!.FocusAsync();
+        userInput = "";
+        StateHasChanged();
+    }
+
+     private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval", "document.getElementById('chat-messages')?.scrollTo(0, document.getElementById('chat-messages').scrollHeight)");
+        }
+        catch
+        {
+            // Ignore JS errors
+        }
     }
 
     public void Dispose()
