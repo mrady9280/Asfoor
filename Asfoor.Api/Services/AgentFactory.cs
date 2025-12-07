@@ -11,6 +11,7 @@ namespace Asfoor.Api.Services;
 public interface IAgentFactory
 {
     Task<AIAgent> CreateChatAgentAsync(ChatRequest request);
+    Task<AIAgent> CreateChatAgentAsync();
 }
 
 public class AgentFactory : IAgentFactory
@@ -49,6 +50,12 @@ public class AgentFactory : IAgentFactory
     {
         var reasoningLevel = request.ReasoningEffortLevel ?? ChatServiceConstants.DefaultReasoningEffortLevel;
         return await CreateChatAgentWithToolsAsync(request.Attachments, reasoningLevel);
+    }
+
+    [Experimental("OPENAI001")]
+    public async Task<AIAgent> CreateChatAgentAsync()
+    {
+        return await CreateChatAgentAsync(new ChatRequest());
     }
 
     /// <summary>

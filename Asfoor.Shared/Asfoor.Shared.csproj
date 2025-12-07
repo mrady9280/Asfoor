@@ -11,6 +11,8 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="Microsoft.Agents.AI" />
+      <PackageReference Include="Microsoft.Agents.AI.AGUI" />
       <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
       <PackageReference Include="Microsoft.Extensions.AI.Abstractions" />
         <PackageReference Include="MudBlazor"/>

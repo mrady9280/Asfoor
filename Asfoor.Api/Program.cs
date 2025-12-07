@@ -4,6 +4,7 @@ using Asfoor.Api.Services;
 using Asfoor.Api.Services.Ingestion;
 using Asfoor.Api.Tools;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
@@ -28,7 +29,7 @@ builder.Services.AddSingleton<OpenAIClient>(sp => client);
 var embeddingGenerator = client.GetEmbeddingClient(config["embeddingModel"]).AsIEmbeddingGenerator();
 builder.Services.AddEmbeddingGenerator(embeddingGenerator);
 
-// builder.Services.AddAGUI();
+builder.Services.AddAGUI();
 
 
 builder.AddQdrantClient("vectordb");
@@ -79,8 +80,8 @@ app.MapPost("/chat/history", async (ChatHistory request, ChatHistoryIngestor ing
     // await ingestor.IngestThreadAsync(request.ConversationId, request.Messages);
     return Results.Ok();
 });
-
-// app.MapAGUI("text-chat", agent);
+var agent = await app.Services.GetRequiredService<IAgentFactory>().CreateChatAgentAsync();
+app.MapAGUI("agchat", agent);
 app.MapDefaultEndpoints();
 
 await app.RunAsync();
