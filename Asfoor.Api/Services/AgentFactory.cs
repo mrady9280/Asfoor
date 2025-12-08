@@ -10,8 +10,14 @@ namespace Asfoor.Api.Services;
 
 public interface IAgentFactory
 {
-    Task<AIAgent> CreateChatAgentAsync(ChatRequest request);
+    Task<AIAgent> CreateChatAgentWithToolsAsync(ChatRequest request);
+    Task<AIAgent> CreateChatAgentWithToolsAsync();
+    Task<AIAgent> CreateIntentAgentAsync();
     Task<AIAgent> CreateChatAgentAsync();
+    Task<AIAgent> CreateImageAgentAsync();
+    Task<AIAgent> CreateAudioAgentAsync();
+    Task<AIAgent> CreateFileAgentAsync();
+
 }
 
 public class AgentFactory : IAgentFactory
@@ -46,16 +52,41 @@ public class AgentFactory : IAgentFactory
     /// Creates the appropriate agent based on the request type (with or without attachments).
     /// </summary>
     [Experimental("OPENAI001")]
-    public async Task<AIAgent> CreateChatAgentAsync(ChatRequest request)
+    public async Task<AIAgent> CreateChatAgentWithToolsAsync(ChatRequest request)
     {
         var reasoningLevel = request.ReasoningEffortLevel ?? ChatServiceConstants.DefaultReasoningEffortLevel;
         return await CreateChatAgentWithToolsAsync(request.Attachments, reasoningLevel);
     }
 
+    public Task<AIAgent> CreateIntentAgentAsync()
+    {
+        throw new NotImplementedException();
+    }
+
     [Experimental("OPENAI001")]
     public async Task<AIAgent> CreateChatAgentAsync()
     {
-        return await CreateChatAgentAsync(new ChatRequest());
+        return await CreateChatAgentWithToolsAsync(new ChatRequest());
+    }
+
+    public Task<AIAgent> CreateChatAgentWithToolsAsync()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<AIAgent> CreateImageAgentAsync()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<AIAgent> CreateAudioAgentAsync()
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<AIAgent> CreateFileAgentAsync()
+    {
+        throw new NotImplementedException();
     }
 
     /// <summary>

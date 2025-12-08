@@ -64,7 +64,8 @@ public class ChatService : IChatService
 
             // Create appropriate user message and agent based on request type
             var userMessage = CreateUserMessage(request);
-            var agent = await _agentFactory.CreateChatAgentAsync(request);
+            
+            var agent = await _agentFactory.CreateChatAgentWithToolsAsync(request);
 
             // Get or deserialize thread
             var thread = GetOrCreateThread(agent, request.ThreadString);

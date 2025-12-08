@@ -80,7 +80,7 @@ app.MapPost("/chat/history", async (ChatHistory request, ChatHistoryIngestor ing
     // await ingestor.IngestThreadAsync(request.ConversationId, request.Messages);
     return Results.Ok();
 });
-var agent = await app.Services.GetRequiredService<IAgentFactory>().CreateChatAgentAsync();
+var agent = await app.Services.GetRequiredService<IAgentFactory>().CreateChatAgentWithToolsAsync();
 app.MapAGUI("agchat", agent);
 app.MapDefaultEndpoints();
 
