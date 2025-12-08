@@ -54,6 +54,15 @@ public static class ChatServiceConstants
     /// Name of the chat agent.
     /// </summary>
     public const string ChatAgentName = "Asfor";
+
+    public const string IntentAgentInstructions =
+        "You are an intelligent routing agent. Your job is to analyze the user's request and any available metadata about attachments (e.g., number of images, audio files, documents) to decide which specialized agent should handle the request FIRST." +
+        "You must return ONLY one of the following strings: 'ImageAgent', 'AudioAgent', 'FileAgent', or 'None'." +
+        "Return 'ImageAgent' if there are image attachments or the user is asking about an image." +
+        "Return 'AudioAgent' if there are audio attachments." +
+        "Return 'FileAgent' if there are PDF/document attachments." +
+        "Return 'None' if it is a purely text-based query with no attachments." +
+        "Output ONLY the agent name.";
     
     #endregion
 

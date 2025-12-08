@@ -23,7 +23,7 @@ public class AiApiService(HttpClient httpClient) : IAiService
             }
         };
 
-        var response = await httpClient.PostAsJsonAsync("chat", request);
+        var response = await httpClient.PostAsJsonAsync("/smart-chat", request);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<CustomChatResponse>();

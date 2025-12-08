@@ -64,7 +64,7 @@ public class ChatService : IChatService
 
             // Create appropriate user message and agent based on request type
             var userMessage = CreateUserMessage(request);
-            
+
             var agent = await _agentFactory.CreateChatAgentWithToolsAsync(request);
 
             // Get or deserialize thread
@@ -80,6 +80,83 @@ public class ChatService : IChatService
         {
             _logger.LogError(ex, "Error processing chat request");
             throw new InvalidOperationException("Failed to process chat request. See inner exception for details.", ex);
+        }
+    }
+
+    private record ResultData(string Thinking, string Message);
+
+    public async Task<CustomChatResponse> ProcessChatRequestWithIntentAsync(ChatRequest request)
+    {
+        if (request == null) throw new ArgumentNullException(nameof(request));
+
+        try
+        {
+            _logger.LogInformation("Processing smart chat request. Attachments: {Count}", request.Attachments.Count);
+
+            // 1. Intent Routing
+            var intentAgent = await _agentFactory.CreateIntentAgentAsync();
+            var routingPrompt = $"User Message: {request.Message}\n" +
+                                $"Attachments: {request.Attachments.Count} files. " +
+                                $"Types: {string.Join(", ", request.Attachments.Select(a => a.ContentType))}";
+
+            // We use a temporary thread for routing as it's stateless per request
+            var routingThread = intentAgent.GetNewThread();
+            var routingMessage = new ChatMessage(ChatRole.User, routingPrompt);
+            var routingResponse = await intentAgent.RunAsync<ResultData>(routingMessage, routingThread);
+            var selectedAgent = routingResponse.Result.Message; // Use .Text property
+
+            _logger.LogInformation("Intent Agent selected: {Agent}", selectedAgent);
+
+            string specialistContext = "";
+
+            // 2. Specialist Execution (if needed)
+            if (selectedAgent.Contains("ImageAgent", StringComparison.OrdinalIgnoreCase) && request.Attachments.Any())
+            {
+                var imageAgent = await _agentFactory.CreateImageAgentAsync(request.Attachments);
+                // We use a new thread for the specialist to isolate context
+                var imageThread = imageAgent.GetNewThread();
+                var imageMessage = new ChatMessage(ChatRole.User, new List<AIContent>()
+                {
+                    new TextContent(request.Message),
+                    new DataContent(request.Attachments.First().Data, request.Attachments.First().ContentType)
+                });
+                var imageResponse = await imageAgent.RunAsync(imageMessage, imageThread);
+                specialistContext = $"\n\n[Image Analysis Context]: {imageResponse.Text}";
+            }
+            else if (selectedAgent.Contains("FileAgent", StringComparison.OrdinalIgnoreCase) &&
+                     request.Attachments.Any())
+            {
+                var fileAgent = await _agentFactory.CreateFileAgentAsync();
+                // We use a new thread for the specialist to isolate context
+                var imageThread = fileAgent.GetNewThread();
+                string dataUri =
+                    $"data:application/pdf;base64,{Convert.ToBase64String(request.Attachments.First().Data)}";
+                var imageMessage = new ChatMessage(ChatRole.User, new List<AIContent>()
+                {
+                    new TextContent(request.Message),
+                    new DataContent(dataUri, request.Attachments[0].ContentType)
+                });
+                var imageResponse = await fileAgent.RunAsync(imageMessage, imageThread);
+                specialistContext = $"\n\n[Image Analysis Context]: {imageResponse.Text}";
+            }
+            // Add other agents here (Audio, File) as per plan (placeholders for now)
+
+            // 3. Final Chat Execution
+            var smartAgent = await _agentFactory.CreateSmartChatAgentAsync();
+            var finalPrompt = request.Message + specialistContext;
+
+            // Use the main conversation thread
+            var thread = GetOrCreateThread(smartAgent, request.ThreadString);
+
+            var userMessage = new ChatMessage(ChatRole.User, finalPrompt);
+            var response = await ExecuteAgentAsync(smartAgent, userMessage, thread);
+
+            return BuildResponse(response, thread);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing smart chat request");
+            throw new InvalidOperationException("Failed to process smart chat request.", ex);
         }
     }
 
@@ -102,9 +179,9 @@ public class ChatService : IChatService
 
         // For requests with attachments, we don't send the data directly to the main reasoning agent.
         // Instead, we inform it about the attachments so it can decide to use the AnalyzeImages tool.
-        var messageWithNotification = request.Message + 
+        var messageWithNotification = request.Message +
                                       $"\n\n[System Notification: The user has attached {request.Attachments.Count} image(s). Use the 'AnalyzeImages' tool to inspect them if necessary.]";
-        
+
         return new ChatMessage(ChatRole.User, messageWithNotification);
     }
 

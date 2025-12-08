@@ -64,6 +64,12 @@ app.MapPost("/chat", async (ChatRequest request, IChatService chatService) =>
     return Results.Ok(response);
 });
 
+app.MapPost("/smart-chat", async (ChatRequest request, IChatService chatService) =>
+{
+    var response = await chatService.ProcessChatRequestWithIntentAsync(request);
+    return Results.Ok(response);
+});
+
 app.MapPost("/ingestDocument", async (SemanticSearch search) =>
 {
     await search.LoadDocumentsAsync();

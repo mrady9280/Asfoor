@@ -12,12 +12,12 @@ public interface IAgentFactory
 {
     Task<AIAgent> CreateChatAgentWithToolsAsync(ChatRequest request);
     Task<AIAgent> CreateChatAgentWithToolsAsync();
-    Task<AIAgent> CreateIntentAgentAsync();
+    Task<ChatClientAgent> CreateIntentAgentAsync();
     Task<AIAgent> CreateChatAgentAsync();
-    Task<AIAgent> CreateImageAgentAsync();
+    Task<AIAgent> CreateSmartChatAgentAsync();
+    Task<AIAgent> CreateImageAgentAsync(List<ChatFileAttachment> attachments);
     Task<AIAgent> CreateAudioAgentAsync();
     Task<AIAgent> CreateFileAgentAsync();
-
 }
 
 public class AgentFactory : IAgentFactory
@@ -58,9 +58,29 @@ public class AgentFactory : IAgentFactory
         return await CreateChatAgentWithToolsAsync(request.Attachments, reasoningLevel);
     }
 
-    public Task<AIAgent> CreateIntentAgentAsync()
+    [Experimental("OPENAI001")]
+    public async Task<ChatClientAgent> CreateIntentAgentAsync()
     {
-        throw new NotImplementedException();
+        _logger.LogDebug("Creating intent agent");
+
+        return await Task.FromResult(_openAiClient
+            .GetChatClient(_chatModel)
+            .AsIChatClient()
+            .CreateAIAgent(
+                options: new ChatClientAgentOptions
+                {
+                    Instructions = ChatServiceConstants.IntentAgentInstructions,
+                    Name = "IntentAgent",
+                    ChatOptions = new ChatOptions
+                    {
+                        RawRepresentationFactory = _ => new ChatCompletionOptions
+                        {
+#pragma warning disable OPENAI001
+                            ReasoningEffortLevel = ChatReasoningEffortLevel.Minimal
+#pragma warning restore OPENAI001
+                        }
+                    }
+                }));
     }
 
     [Experimental("OPENAI001")]
@@ -69,24 +89,103 @@ public class AgentFactory : IAgentFactory
         return await CreateChatAgentWithToolsAsync(new ChatRequest());
     }
 
-    public Task<AIAgent> CreateChatAgentWithToolsAsync()
+    /// <summary>
+    /// Creates a chat agent with tools but WITHOUT the image analysis tool.
+    /// This is for the final step of the smart chat flow.
+    /// </summary>
+    [Experimental("OPENAI001")]
+    public async Task<AIAgent> CreateSmartChatAgentAsync()
     {
-        throw new NotImplementedException();
+        _logger.LogDebug("Creating smart chat agent (no image tool)");
+
+        var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync, "search-tool");
+
+        var parsedReasoningLevel = ParseReasoningEffortLevel(ChatServiceConstants.DefaultReasoningEffortLevel);
+        var memoryAgent = CreateMemoryAgent(parsedReasoningLevel);
+
+        var agent = _openAiClient
+            .GetChatClient(_chatModel)
+            .AsIChatClient()
+            .CreateAIAgent(
+                options: new ChatClientAgentOptions
+                {
+                    Instructions = ChatServiceConstants.ChatAgentInstructions,
+                    Name = ChatServiceConstants.ChatAgentName,
+                    AIContextProviderFactory = _ => new CustomContextProvider(
+                        memoryAgent,
+                        _configuration,
+                        ChatServiceConstants.DefaultUserId),
+                    ChatOptions = new ChatOptions
+                    {
+                        Tools = [searchFunc], // No analyzeImagesFunc
+                        RawRepresentationFactory = _ => new ChatCompletionOptions
+                        {
+#pragma warning disable OPENAI001
+                            ReasoningEffortLevel = parsedReasoningLevel
+#pragma warning restore OPENAI001
+                        },
+                    }
+                })
+            .AsBuilder()
+            .UseOpenTelemetry()
+            .Use((agent, context, next, ct) =>
+                Middlewares.FunctionCallMiddleware(agent, context, next, ct,
+                    _logger))
+            .Build();
+
+        return await Task.FromResult(agent);
     }
 
-    public Task<AIAgent> CreateImageAgentAsync()
+    [Experimental("OPENAI001")]
+    public async Task<AIAgent> CreateChatAgentWithToolsAsync()
     {
-        throw new NotImplementedException();
+        return await CreateChatAgentWithToolsAsync(new ChatRequest());
     }
 
-    public Task<AIAgent> CreateAudioAgentAsync()
+    public async Task<AIAgent> CreateImageAgentAsync(List<ChatFileAttachment> attachments)
     {
-        throw new NotImplementedException();
+        _logger.LogDebug("Creating image specialist agent");
+
+        // var analyzeImagesFunc = AIFunctionFactory.Create(_tools.CreateAnalyzeImagesFunc(attachments), "AnalyzeImages",
+        // "Analyzes attached images to answer questions about them.");
+
+        return _openAiClient
+            .GetChatClient(_imageModel)
+            .AsIChatClient()
+            .CreateAIAgent(
+                options: new ChatClientAgentOptions
+                {
+                    Instructions =
+                        "You are an expert image analyst. Your goal is to describe images and answer questions about them based on the user's prompt. Be detailed and specific.",
+                    Name = "ImageAgent",
+                })
+            .AsBuilder()
+            .UseOpenTelemetry()
+            .Use((agent, context, next, ct) =>
+                Middlewares.FunctionCallMiddleware(agent, context, next, ct, _logger))
+            .Build();
     }
 
-    public Task<AIAgent> CreateFileAgentAsync()
+    public async Task<AIAgent> CreateAudioAgentAsync()
     {
-        throw new NotImplementedException();
+        // Placeholder implementation using image model as requested for "all other agents"
+        _logger.LogDebug("Creating audio specialist agent (placeholder)");
+        return await Task.FromResult(_openAiClient
+            .GetChatClient(_imageModel)
+            .AsIChatClient()
+            .CreateAIAgent(new ChatClientAgentOptions
+                { Name = "AudioAgent", Instructions = "You are an audio analysis agent (Placeholder)." }));
+    }
+
+    public async Task<AIAgent> CreateFileAgentAsync()
+    {
+        // Placeholder implementation using image model as requested for "all other agents"
+        _logger.LogDebug("Creating file specialist agent (placeholder)");
+        return await Task.FromResult(_openAiClient
+            .GetChatClient(_imageModel)
+            .AsIChatClient()
+            .CreateAIAgent(new ChatClientAgentOptions
+                { Name = "FileAgent", Instructions = "You are a file analysis agent (Placeholder)." }));
     }
 
     /// <summary>
@@ -95,12 +194,14 @@ public class AgentFactory : IAgentFactory
     /// <param name="attachments">The list of file attachments (images) from the request.</param>
     /// <param name="reasoningEffortLevel">The reasoning effort level to use for the agent.</param>
     [Experimental("OPENAI001")]
-    private async Task<AIAgent> CreateChatAgentWithToolsAsync(List<ChatFileAttachment> attachments, string? reasoningEffortLevel = null)
+    private async Task<AIAgent> CreateChatAgentWithToolsAsync(List<ChatFileAttachment> attachments,
+        string? reasoningEffortLevel = null)
     {
         _logger.LogDebug("Creating chat agent with tools with reasoning level: {ReasoningLevel}", reasoningEffortLevel);
 
         var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync, "search-tool");
-        var analyzeImagesFunc = AIFunctionFactory.Create(_tools.CreateAnalyzeImagesFunc(attachments), "AnalyzeImages", "Analyzes attached images to answer questions about them. Use this tool when the user asks about the images they sent.");
+        var analyzeImagesFunc = AIFunctionFactory.Create(_tools.CreateAnalyzeImagesFunc(attachments), "AnalyzeImages",
+            "Analyzes attached images to answer questions about them. Use this tool when the user asks about the images they sent.");
 
         var parsedReasoningLevel = ParseReasoningEffortLevel(reasoningEffortLevel);
         var memoryAgent = CreateMemoryAgent(parsedReasoningLevel);
@@ -132,7 +233,7 @@ public class AgentFactory : IAgentFactory
             .UseOpenTelemetry()
             .Use((agent, context, next, ct) =>
                 Middlewares.FunctionCallMiddleware(agent, context, next, ct,
-                    _logger)) 
+                    _logger))
             .Build();
 
         return await Task.FromResult(agent);
