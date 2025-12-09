@@ -128,16 +128,14 @@ public class ChatService : IChatService
             {
                 var fileAgent = await _agentFactory.CreateFileAgentAsync();
                 // We use a new thread for the specialist to isolate context
-                var imageThread = fileAgent.GetNewThread();
-                string dataUri =
-                    $"data:application/pdf;base64,{Convert.ToBase64String(request.Attachments.First().Data)}";
-                var imageMessage = new ChatMessage(ChatRole.User, new List<AIContent>()
+                var fileThread = fileAgent.GetNewThread();
+                var fleMessage = new ChatMessage(ChatRole.User, new List<AIContent>()
                 {
                     new TextContent(request.Message),
-                    new DataContent(dataUri, request.Attachments[0].ContentType)
+                    new DataContent(request.Attachments.First().Data, request.Attachments.First().ContentType)
                 });
-                var imageResponse = await fileAgent.RunAsync(imageMessage, imageThread);
-                specialistContext = $"\n\n[Image Analysis Context]: {imageResponse.Text}";
+                var fileResponse = await fileAgent.RunAsync(fleMessage, fileThread);
+                specialistContext = $"\n\n[File Analysis Context]: {fileResponse.Text}";
             }
             // Add other agents here (Audio, File) as per plan (placeholders for now)
 
