@@ -55,7 +55,7 @@ public class DocumentIngestor(
     }
 
 
-    private AIAgent CreateAgent()
+    private ChatClientAgent CreateAgent()
     {
         var agent = openAiClient.GetChatClient(configuration["chatModel"]).AsIChatClient().CreateAIAgent(
             options: new ChatClientAgentOptions()
@@ -73,7 +73,7 @@ public class DocumentIngestor(
 #pragma warning restore OPENAI001
                     }
                 }
-            }).AsBuilder().UseOpenTelemetry().Build();
+            });
         return agent;
     }
 

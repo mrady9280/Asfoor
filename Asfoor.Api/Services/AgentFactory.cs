@@ -10,14 +10,14 @@ namespace Asfoor.Api.Services;
 
 public interface IAgentFactory
 {
-    Task<AIAgent> CreateChatAgentWithToolsAsync(ChatRequest request);
-    Task<AIAgent> CreateChatAgentWithToolsAsync();
+    Task<ChatClientAgent> CreateChatAgentWithToolsAsync(ChatRequest request);
+    Task<ChatClientAgent> CreateChatAgentWithToolsAsync();
     Task<ChatClientAgent> CreateIntentAgentAsync();
-    Task<AIAgent> CreateChatAgentAsync();
-    Task<AIAgent> CreateSmartChatAgentAsync();
-    Task<AIAgent> CreateImageAgentAsync(List<ChatFileAttachment> attachments);
-    Task<AIAgent> CreateAudioAgentAsync();
-    Task<AIAgent> CreateFileAgentAsync();
+    Task<ChatClientAgent> CreateChatAgentAsync();
+    Task<ChatClientAgent> CreateSmartChatAgentAsync();
+    Task<ChatClientAgent> CreateImageAgentAsync();
+    Task<ChatClientAgent> CreateAudioAgentAsync();
+    Task<ChatClientAgent> CreateFileAgentAsync();
 }
 
 public class AgentFactory : IAgentFactory
@@ -52,7 +52,7 @@ public class AgentFactory : IAgentFactory
     /// Creates the appropriate agent based on the request type (with or without attachments).
     /// </summary>
     [Experimental("OPENAI001")]
-    public async Task<AIAgent> CreateChatAgentWithToolsAsync(ChatRequest request)
+    public async Task<ChatClientAgent> CreateChatAgentWithToolsAsync(ChatRequest request)
     {
         var reasoningLevel = request.ReasoningEffortLevel ?? ChatServiceConstants.DefaultReasoningEffortLevel;
         return await CreateChatAgentWithToolsAsync(request.Attachments, reasoningLevel);
@@ -84,7 +84,7 @@ public class AgentFactory : IAgentFactory
     }
 
     [Experimental("OPENAI001")]
-    public async Task<AIAgent> CreateChatAgentAsync()
+    public async Task<ChatClientAgent> CreateChatAgentAsync()
     {
         return await CreateChatAgentWithToolsAsync(new ChatRequest());
     }
@@ -94,7 +94,7 @@ public class AgentFactory : IAgentFactory
     /// This is for the final step of the smart chat flow.
     /// </summary>
     [Experimental("OPENAI001")]
-    public async Task<AIAgent> CreateSmartChatAgentAsync()
+    public async Task<ChatClientAgent> CreateSmartChatAgentAsync()
     {
         _logger.LogDebug("Creating smart chat agent (no image tool)");
 
@@ -125,24 +125,18 @@ public class AgentFactory : IAgentFactory
 #pragma warning restore OPENAI001
                         },
                     }
-                })
-            .AsBuilder()
-            .UseOpenTelemetry()
-            .Use((agent, context, next, ct) =>
-                Middlewares.FunctionCallMiddleware(agent, context, next, ct,
-                    _logger))
-            .Build();
+                });
 
         return await Task.FromResult(agent);
     }
 
     [Experimental("OPENAI001")]
-    public async Task<AIAgent> CreateChatAgentWithToolsAsync()
+    public async Task<ChatClientAgent> CreateChatAgentWithToolsAsync()
     {
         return await CreateChatAgentWithToolsAsync(new ChatRequest());
     }
 
-    public async Task<AIAgent> CreateImageAgentAsync(List<ChatFileAttachment> attachments)
+    public async Task<ChatClientAgent> CreateImageAgentAsync()
     {
         _logger.LogDebug("Creating image specialist agent");
 
@@ -158,15 +152,10 @@ public class AgentFactory : IAgentFactory
                     Instructions =
                         "You are an expert image analyst. Your goal is to describe images and answer questions about them based on the user's prompt. Be detailed and specific.",
                     Name = "ImageAgent",
-                })
-            .AsBuilder()
-            .UseOpenTelemetry()
-            .Use((agent, context, next, ct) =>
-                Middlewares.FunctionCallMiddleware(agent, context, next, ct, _logger))
-            .Build();
+                });
     }
 
-    public async Task<AIAgent> CreateAudioAgentAsync()
+    public async Task<ChatClientAgent> CreateAudioAgentAsync()
     {
         // Placeholder implementation using image model as requested for "all other agents"
         _logger.LogDebug("Creating audio specialist agent (placeholder)");
@@ -174,10 +163,10 @@ public class AgentFactory : IAgentFactory
             .GetChatClient(_imageModel)
             .AsIChatClient()
             .CreateAIAgent(new ChatClientAgentOptions
-                { Name = "AudioAgent", Instructions = "You are an audio analysis agent (Placeholder)." }));
+            { Name = "AudioAgent", Instructions = "You are an audio analysis agent (Placeholder)." }));
     }
 
-    public async Task<AIAgent> CreateFileAgentAsync()
+    public async Task<ChatClientAgent> CreateFileAgentAsync()
     {
         // Placeholder implementation using image model as requested for "all other agents"
         _logger.LogDebug("Creating file specialist agent (placeholder)");
@@ -185,7 +174,7 @@ public class AgentFactory : IAgentFactory
             .GetChatClient(_imageModel)
             .AsIChatClient()
             .CreateAIAgent(new ChatClientAgentOptions
-                { Name = "FileAgent", Instructions = "You are a file analysis agent (Placeholder)." }));
+            { Name = "FileAgent", Instructions = "You are a file analysis agent (Placeholder)." }));
     }
 
     /// <summary>
@@ -194,7 +183,7 @@ public class AgentFactory : IAgentFactory
     /// <param name="attachments">The list of file attachments (images) from the request.</param>
     /// <param name="reasoningEffortLevel">The reasoning effort level to use for the agent.</param>
     [Experimental("OPENAI001")]
-    private async Task<AIAgent> CreateChatAgentWithToolsAsync(List<ChatFileAttachment> attachments,
+    private async Task<ChatClientAgent> CreateChatAgentWithToolsAsync(List<ChatFileAttachment> attachments,
         string? reasoningEffortLevel = null)
     {
         _logger.LogDebug("Creating chat agent with tools with reasoning level: {ReasoningLevel}", reasoningEffortLevel);
@@ -228,13 +217,7 @@ public class AgentFactory : IAgentFactory
 #pragma warning restore OPENAI001
                         },
                     }
-                })
-            .AsBuilder()
-            .UseOpenTelemetry()
-            .Use((agent, context, next, ct) =>
-                Middlewares.FunctionCallMiddleware(agent, context, next, ct,
-                    _logger))
-            .Build();
+                });
 
         return await Task.FromResult(agent);
     }

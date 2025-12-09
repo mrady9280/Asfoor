@@ -5,6 +5,7 @@ using Asfoor.Api.Services.Ingestion;
 using Asfoor.Api.Tools;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.Hosting.AGUI.AspNetCore;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
@@ -87,6 +88,7 @@ app.MapPost("/chat/history", async (ChatHistory request, ChatHistoryIngestor ing
     return Results.Ok();
 });
 var agent = await app.Services.GetRequiredService<IAgentFactory>().CreateChatAgentWithToolsAsync();
+
 app.MapAGUI("agchat", agent);
 app.MapDefaultEndpoints();
 

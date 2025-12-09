@@ -112,7 +112,7 @@ public class ChatService : IChatService
             // 2. Specialist Execution (if needed)
             if (selectedAgent.Contains("ImageAgent", StringComparison.OrdinalIgnoreCase) && request.Attachments.Any())
             {
-                var imageAgent = await _agentFactory.CreateImageAgentAsync(request.Attachments);
+                var imageAgent = await _agentFactory.CreateImageAgentAsync();
                 // We use a new thread for the specialist to isolate context
                 var imageThread = imageAgent.GetNewThread();
                 var imageMessage = new ChatMessage(ChatRole.User, new List<AIContent>()
@@ -190,7 +190,7 @@ public class ChatService : IChatService
     /// <summary>
     /// Gets an existing thread or creates a new one.
     /// </summary>
-    private AgentThread GetOrCreateThread(AIAgent agent, string threadString)
+    private AgentThread GetOrCreateThread(ChatClientAgent agent, string threadString)
     {
         if (string.IsNullOrEmpty(threadString))
         {
@@ -211,7 +211,7 @@ public class ChatService : IChatService
     /// Executes the agent with the given message and thread.
     /// </summary>
     private async Task<AgentRunResponse> ExecuteAgentAsync(
-        AIAgent agent,
+        ChatClientAgent agent,
         ChatMessage userMessage,
         AgentThread thread)
     {

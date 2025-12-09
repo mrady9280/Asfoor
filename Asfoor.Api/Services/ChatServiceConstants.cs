@@ -34,7 +34,8 @@ public static class ChatServiceConstants
     /// Instructions for the memory extraction agent.
     /// </summary>
     public const string MemoryAgentInstructions = 
-        "Please examine the user’s message and identify any personal information or belongings or memories that are not already known to us. ";
+        "Please examine the user’s message and identify any personal information " +
+        "or belongings or memories that are not already known to us only the personal information that can help us to understand the user better." ;
     
     /// <summary>
     /// Instructions for the main chat agent with search capabilities.
@@ -57,12 +58,12 @@ public static class ChatServiceConstants
 
     public const string IntentAgentInstructions =
         "You are an intelligent routing agent. Your job is to analyze the user's request and any available metadata about attachments (e.g., number of images, audio files, documents) to decide which specialized agent should handle the request FIRST." +
-        "You must return ONLY one of the following strings: 'ImageAgent', 'AudioAgent', 'FileAgent', or 'None'." +
+        "You must return ONLY one of the following agents: 'ImageAgent', 'AudioAgent', 'FileAgent', or 'Asfor'." +
         "Return 'ImageAgent' if there are image attachments or the user is asking about an image." +
         "Return 'AudioAgent' if there are audio attachments." +
         "Return 'FileAgent' if there are PDF/document attachments." +
-        "Return 'None' if it is a purely text-based query with no attachments." +
-        "Output ONLY the agent name.";
+        "Return 'Asfor' if it is a purely text-based query with no attachments." +
+        "Output ONLY the Agent";
     
     #endregion
 

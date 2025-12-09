@@ -34,7 +34,7 @@ public class ChatHistoryIngestor(
 #pragma warning restore OPENAI001
                         }
                     }
-                }).AsBuilder().UseOpenTelemetry().Build();
+                });
 
             var chatMessages = messages.ToList();
             var text = string.Join("\n", chatMessages.Select(m => $"{m.Role}: {m.Text}"));
