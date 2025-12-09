@@ -3,6 +3,7 @@ using System.Text.Json;
 using Asfoo.Models;
 using Asfoor.Api.Tools;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Workflows;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Chat;
@@ -136,6 +137,20 @@ public class ChatService : IChatService
                 });
                 var fileResponse = await fileAgent.RunAsync(fleMessage, fileThread);
                 specialistContext = $"\n\n[File Analysis Context]: {fileResponse.Text}";
+            }
+            else if (selectedAgent.Contains("Audio", StringComparison.OrdinalIgnoreCase) &&
+                     request.Attachments.Any())
+            {
+                var audioAgent = await _agentFactory.CreateAudioAgentAsync();
+                // We use a new thread for the specialist to isolate context
+                var fileThread = audioAgent.GetNewThread();
+                var audioMessage = new ChatMessage(ChatRole.User, new List<AIContent>()
+                {
+                    new TextContent(request.Message),
+                    new DataContent(request.Attachments.First().Data, request.Attachments.First().ContentType)
+                });
+                var fileResponse = await audioAgent.RunAsync(audioMessage, fileThread);
+                specialistContext = $"\n\n[audio Analysis Context]: {fileResponse.Text}";
             }
             // Add other agents here (Audio, File) as per plan (placeholders for now)
 
