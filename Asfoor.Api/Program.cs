@@ -1,6 +1,7 @@
 using System.ClientModel;
 using Asfoo.Models;
 using Asfoor.Api.Services;
+using Asfoor.Api.Services.Executors;
 using Asfoor.Api.Services.Ingestion;
 using Asfoor.Api.Tools;
 using Microsoft.Agents.AI;
@@ -36,13 +37,14 @@ builder.Services.AddAGUI();
 builder.AddQdrantClient("vectordb");
 builder.Services.AddQdrantVectorStore();
 builder.Services.AddQdrantCollection<Guid, IngestedChunk>(IngestedChunk.CollectionName);
-builder.Services.AddSingleton<DataIngestor>();
 builder.Services.AddSingleton<ChatHistoryIngestor>();
 builder.Services.AddSingleton<DocumentIngestor>();
-builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddSingleton<Tools>();
 builder.Services.AddSingleton<IAgentFactory, AgentFactory>();
 builder.Services.AddSingleton<IChatService, ChatService>();
+builder.Services.AddSingleton<ImageExecutor>();
+builder.Services.AddSingleton<IntentExecutor>();
+builder.Services.AddSingleton<SmartChatExecutor>();
 builder.Services.AddKeyedSingleton("ingestion_directory",
     new DirectoryInfo(config["docPath"] ?? throw new InvalidOperationException()));
 
@@ -71,11 +73,6 @@ app.MapPost("/smart-chat", async (ChatRequest request, IChatService chatService)
     return Results.Ok(response);
 });
 
-app.MapPost("/ingestDocument", async (SemanticSearch search) =>
-{
-    await search.LoadDocumentsAsync();
-    return Results.Ok("Ingestion complete");
-});
 app.MapPost("/ingest", async (DocumentIngestor ingestor) =>
 {
     await ingestor.IngestDocumentsAsync();
@@ -88,6 +85,9 @@ app.MapPost("/chat/history", async (ChatHistory request, ChatHistoryIngestor ing
     return Results.Ok();
 });
 var agent = await app.Services.GetRequiredService<IAgentFactory>().CreateChatAgentWithToolsAsync();
+
+
+
 
 app.MapAGUI("agchat", agent);
 app.MapDefaultEndpoints();

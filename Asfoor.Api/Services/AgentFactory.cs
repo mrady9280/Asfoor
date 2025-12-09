@@ -171,7 +171,7 @@ public class AgentFactory : IAgentFactory
         // Placeholder implementation using image model as requested for "all other agents"
         _logger.LogDebug("Creating file specialist agent (placeholder)");
         return await Task.FromResult(_openAiClient
-            .GetChatClient(_imageModel)
+            .GetChatClient(_chatModel)
             .AsIChatClient()
             .CreateAIAgent(new ChatClientAgentOptions
             { Name = "FileAgent", Instructions = "You are a file analysis agent (Placeholder)." }));
