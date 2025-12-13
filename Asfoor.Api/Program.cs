@@ -1,5 +1,6 @@
 using System.ClientModel;
 using Asfoo.Models;
+using Asfoor.Api.Agents;
 using Asfoor.Api.Services;
 using Asfoor.Api.Services.Executors;
 using Asfoor.Api.Services.Ingestion;
@@ -84,12 +85,13 @@ app.MapPost("/chat/history", async (ChatHistory request, ChatHistoryIngestor ing
     // await ingestor.IngestThreadAsync(request.ConversationId, request.Messages);
     return Results.Ok();
 });
-var agent = await app.Services.GetRequiredService<IAgentFactory>().CreateChatAgentWithToolsAsync();
+var smartChatAgent = await app.Services.GetRequiredService<IAgentFactory>().CreateSmartChatAgentAsync();
+var imageAgent = await app.Services.GetRequiredService<IAgentFactory>().CreateImageAgentAsync();
+
+var smartAgent = new SmartChatAgent<ChatResponse>(imageAgent, smartChatAgent);
 
 
-
-
-app.MapAGUI("agchat", agent);
+app.MapAGUI("agchat", smartAgent);
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

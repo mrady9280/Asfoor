@@ -172,6 +172,7 @@
     AIAgent? _agent;
     HttpClient? _httpClient;
     AGUIChatClient? _chatClient;
+    AgentThread _thread; 
 
     protected override void OnInitialized()
     {
@@ -180,6 +181,7 @@
         string apiBaseAddress = Configuration["API_HTTP"] + "/agchat";
         _chatClient = new AGUIChatClient(_httpClient, apiBaseAddress);
         _agent = _chatClient!.CreateAIAgent();
+        _thread = _agent.GetNewThread();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -270,7 +272,7 @@
         attachedFiles.Clear();
         await AddUserMessageAsync(userMsg);
     }
-
+    
     private async Task AddUserMessageAsync(ChatMessage userMessage)
     {
         CancelAnyCurrentResponse();
@@ -284,9 +286,9 @@
         StateHasChanged();
         await ScrollToBottom();
 
-        try 
+        try
         {
-            await foreach (AgentRunResponseUpdate update in _agent!.RunStreamingAsync(messages.Skip(statefulMessageCount)))
+            await foreach (AgentRunResponseUpdate update in _agent.RunStreamingAsync(userMessage,_thread))
             {
                 foreach (AIContent content in update.Contents)
                 {
@@ -296,12 +298,6 @@
                             messages.AddMessages(new ChatResponseUpdate(ChatRole.Assistant, [textContent]), filter: c => c is not TextContent);
                             responseText.Text += update.Text;
                             break;
-                            
-                        // Revert to simpler logic (as requested previously) for functional calls:
-                        // Just append text representation if possible or ignore if not supported by UI request.
-                        // But wait, the previous revert kept the logic that added text representation to messages!
-                        // Let's ensure we maintain that compatibility.
-                        
                         case FunctionCallContent functionCallContent:
                             StringBuilder toolCallDetails = new();
                             toolCallDetails.Append($"[Tool Call: {functionCallContent.Name}");
