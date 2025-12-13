@@ -99,6 +99,7 @@ public class AgentFactory : IAgentFactory
         _logger.LogDebug("Creating smart chat agent (no image tool)");
 
         var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync, "search-tool");
+        var webSearchFunc = AIFunctionFactory.Create(_tools.WebSearchAsync, "web-search-tool", "Performs a web search using Brave Search to find information on the internet. Use this when you need current information or answers not found in your memory.");
 
         var parsedReasoningLevel = ParseReasoningEffortLevel(ChatServiceConstants.DefaultReasoningEffortLevel);
         var memoryAgent = CreateMemoryAgent(parsedReasoningLevel);
@@ -117,7 +118,7 @@ public class AgentFactory : IAgentFactory
                         ChatServiceConstants.DefaultUserId),
                     ChatOptions = new ChatOptions
                     {
-                        Tools = [searchFunc], // No analyzeImagesFunc
+                        Tools = [searchFunc, webSearchFunc], // No analyzeImagesFunc
                         RawRepresentationFactory = _ => new ChatCompletionOptions
                         {
 #pragma warning disable OPENAI001
@@ -189,6 +190,7 @@ public class AgentFactory : IAgentFactory
         _logger.LogDebug("Creating chat agent with tools with reasoning level: {ReasoningLevel}", reasoningEffortLevel);
 
         var searchFunc = AIFunctionFactory.Create(_tools.SearchAsync, "search-tool");
+        var webSearchFunc = AIFunctionFactory.Create(_tools.WebSearchAsync, "web-search-tool", "Performs a web search using Brave Search to find information on the internet. Use this when you need current information or answers not found in your memory.");
         var analyzeImagesFunc = AIFunctionFactory.Create(_tools.CreateAnalyzeImagesFunc(attachments), "AnalyzeImages",
             "Analyzes attached images to answer questions about them. Use this tool when the user asks about the images they sent.");
 
@@ -209,7 +211,7 @@ public class AgentFactory : IAgentFactory
                         ChatServiceConstants.DefaultUserId),
                     ChatOptions = new ChatOptions
                     {
-                        Tools = [searchFunc, analyzeImagesFunc],
+                        Tools = [searchFunc, webSearchFunc, analyzeImagesFunc],
                         RawRepresentationFactory = _ => new ChatCompletionOptions
                         {
 #pragma warning disable OPENAI001

@@ -8,6 +8,8 @@ var chatModel = builder.AddParameter("chatModel", secret: true);
 var imageModel = builder.AddParameter("imageModel", secret: true);
 var apiKey = builder.AddParameter("apiKey", secret: true);
 var documentPath = builder.AddParameter("docPath", secret: true);
+var webSearchKey = builder.AddParameter("webSearchKey", secret: true);
+var webSearchApi = builder.AddParameter("webSearchApi", secret: true);
 var vectorDbPath = builder.AddParameter("vectorDbPath", secret: true);
 
 var vectorDB = builder.AddQdrant("vectordb")
@@ -23,7 +25,9 @@ api.WithEnvironment("llmEndpoint", llmEndpoint)
     .WithEnvironment("chatModel", chatModel)
     .WithEnvironment("imageModel", imageModel)
     .WithEnvironment("ApiKey", apiKey)
-    .WithEnvironment("docPath", documentPath);
+    .WithEnvironment("docPath", documentPath)
+    .WithEnvironment("webSearchKey", webSearchKey)
+    .WithEnvironment("webSearchApi", webSearchApi);
 api
     .WithReference(vectorDB)
     .WaitFor(vectorDB);
