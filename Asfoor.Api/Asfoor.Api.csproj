@@ -7,19 +7,20 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="HtmlAgilityPack" />
         <PackageReference Include="JetBrains.Annotations" />
-        <PackageReference Include="Microsoft.Agents.AI"/>
+        <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" />
-        <PackageReference Include="Microsoft.Extensions.AI.OpenAI"/>
-        <PackageReference Include="Microsoft.Extensions.AI"/>
-        <PackageReference Include="Microsoft.Extensions.DataIngestion"/>
-        <PackageReference Include="Microsoft.Extensions.DataIngestion.Markdig"/>
-        <PackageReference Include="Microsoft.Extensions.DataIngestion.MarkItDown"/>
-        <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase"/>
-        <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase"/>
-        <PackageReference Include="Aspire.Qdrant.Client"/>
-        <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant"/>
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi"/>
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+        <PackageReference Include="Microsoft.Extensions.AI" />
+        <PackageReference Include="Microsoft.Extensions.DataIngestion" />
+        <PackageReference Include="Microsoft.Extensions.DataIngestion.Markdig" />
+        <PackageReference Include="Microsoft.Extensions.DataIngestion.MarkItDown" />
+        <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" />
+        <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" />
+        <PackageReference Include="Aspire.Qdrant.Client" />
+        <PackageReference Include="Microsoft.SemanticKernel.Connectors.Qdrant" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Scalar.AspNetCore" />
     </ItemGroup>
 
